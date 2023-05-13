@@ -17,12 +17,12 @@ public class App
 	private static final Logger logger = LoggerFactory.getLogger(App.class);
     public static void main( String[] args )
     {
-    //  ClientContext context =  ClientContext.getInstance();
+     //ClientContext context =  ClientContext.getInstance();
     	FactoryDAO factory = ClientContext.getInstance().init().getAPIFactory();
     	factory.startClient();
     	CustomApplication user = (CustomApplication) factory.newInstance(FactoryDAO.USER_CLASS);
     	user.sendMessage();
-   //   context.initClient();
+    //  context.initClient();
       
     }
 }

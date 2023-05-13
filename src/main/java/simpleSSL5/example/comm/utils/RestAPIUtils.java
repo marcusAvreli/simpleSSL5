@@ -2,6 +2,10 @@ package simpleSSL5.example.comm.utils;
 
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
+import java.nio.ByteBuffer;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.security.KeyManagementException;
 import java.security.KeyStore;
 import java.security.KeyStoreException;
@@ -9,6 +13,8 @@ import java.security.NoSuchAlgorithmException;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
+import java.util.Base64;
+import java.util.Base64.Encoder;
 import java.util.List;
 import java.util.function.Consumer;
 
@@ -41,12 +47,12 @@ import simpleSSL5.api.oauth2.OAuth2ProtocolException;
 import simpleSSL5.api.oauth2.TokenChangeObserver;
 import simpleSSL5.commons.util.Observable;
 
-public class RestAPIUtils implements TokenServiceHttpClient,Observable<TokenChangeObserver<MyToken>>{
-	   /**
-     * Obtain a JerseyClient whit SSL
-     *
-     * @return Jersey Client
-     */
+public class RestAPIUtils implements TokenServiceHttpClient, Observable<TokenChangeObserver<MyToken>> {
+	/**
+	 * Obtain a JerseyClient whit SSL
+	 *
+	 * @return Jersey Client
+	 */
 	private static final Logger logger = LoggerFactory.getLogger(RestAPIUtils.class);
 	private static ClientBuilder clientBuilder = null;
 	private static final int DEFAULT_CONNECT_TIMEOUT = 600;
@@ -58,159 +64,167 @@ public class RestAPIUtils implements TokenServiceHttpClient,Observable<TokenChan
 	protected static JerseyClient client;
 	@SuppressWarnings("rawtypes")
 	private Class tokenClass;
-    public static JerseyClient getJerseyClient() {
-    	if(null == clientBuilder) {
-    		ClientConfig config = new ClientConfig();
-    		
-    		config.property(ClientProperties.CONNECT_TIMEOUT, connectTimeout);
-    		config.property(ClientProperties.READ_TIMEOUT, readTimeout);
-    		clientBuilder = JerseyClientBuilder.newBuilder().withConfig(config);//.register(MultiPartFeature.class);
-    	
-    		clientBuilder.sslContext(JerseySSL());
-    		if(null == client) {
-    			client = (JerseyClient) clientBuilder.build();
-    		}
-    	}
-        return client;
-    }
-    
-    
-    private static SSLContext JerseySSL() {
-    	//client=ClientBuilder.newClient();
-		//webTarget=client.target(Constants.getBaseurl());
-    	SSLContext sslContext = null;
+
+	public static JerseyClient getJerseyClient() {
+		if (null == clientBuilder) {
+			ClientConfig config = new ClientConfig();
+
+			config.property(ClientProperties.CONNECT_TIMEOUT, connectTimeout);
+			config.property(ClientProperties.READ_TIMEOUT, readTimeout);
+			clientBuilder = JerseyClientBuilder.newBuilder().withConfig(config);// .register(MultiPartFeature.class);
+
+			clientBuilder.sslContext(JerseySSL());
+			if (null == client) {
+				client = (JerseyClient) clientBuilder.build();
+			}
+		}
+		return client;
+	}
+
+	private static SSLContext JerseySSL() {
+		// client=ClientBuilder.newClient();
+		// webTarget=client.target(Constants.getBaseurl());
+		SSLContext sslContext = null;
 		FileInputStream myKeys;
 		try {
-			
+
 			// Get hold of the default trust manager
-			
-		//	SSLContext sslContext = SSLContext.getInstance("TLS");
+
+			// SSLContext sslContext = SSLContext.getInstance("TLS");
 			myKeys = new FileInputStream("C:/Users/User/eclipse-workspace/mystore.jks");
-		
 
-		// Do the same with your trust store this time
-		// Adapt how you load the keystore to your needs
-		KeyStore myTrustStore = KeyStore.getInstance(KeyStore.getDefaultType());
-		myTrustStore.load(myKeys, "changeit".toCharArray());
+			// Do the same with your trust store this time
+			// Adapt how you load the keystore to your needs
+			KeyStore myTrustStore = KeyStore.getInstance(KeyStore.getDefaultType());
+			myTrustStore.load(myKeys, "changeit".toCharArray());
 
-		myKeys.close();
+			myKeys.close();
 
-		TrustManagerFactory tmf = TrustManagerFactory
-		    .getInstance(TrustManagerFactory.getDefaultAlgorithm());
-		tmf.init(myTrustStore);
-		
-		// Get hold of the default trust manager
-		X509TrustManager myTm = null;
-		for (TrustManager tm : tmf.getTrustManagers()) {
-		    if (tm instanceof X509TrustManager) {
-		        myTm = (X509TrustManager) tm;
-		        break;
-		    }
-		}
-		X509TrustManager defaultTm = null;
-		for (TrustManager tm : tmf.getTrustManagers()) {
-		    if (tm instanceof X509TrustManager) {
-		        defaultTm = (X509TrustManager) tm;
-		        break;
-		    }
-		}
-		// Wrap it in your own class.
-		final X509TrustManager finalDefaultTm = defaultTm;
-		final X509TrustManager finalMyTm = myTm;
-		X509TrustManager customTm = new X509TrustManager() {
-		    @Override
-		    public X509Certificate[] getAcceptedIssuers() {
-		        // If you're planning to use client-cert auth,
-		        // merge results from "defaultTm" and "myTm".
-		        return finalDefaultTm.getAcceptedIssuers();
-		    }
+			TrustManagerFactory tmf = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+			tmf.init(myTrustStore);
 
-		    @Override
-		    public void checkServerTrusted(X509Certificate[] chain,
-		            String authType) throws CertificateException {
-		        try {
-		            finalMyTm.checkServerTrusted(chain, authType);
-		        } catch (CertificateException e) {
-		            // This will throw another CertificateException if this fails too.
-		            finalDefaultTm.checkServerTrusted(chain, authType);
-		        }
-		    }
-
-		    @Override
-		    public void checkClientTrusted(X509Certificate[] chain,
-		            String authType) throws CertificateException {
-		        // If you're planning to use client-cert auth,
-		        // do the same as checking the server.
-		        finalDefaultTm.checkClientTrusted(chain, authType);
-		    }
-		};
-
-		ClientConfig config = new ClientConfig();
-		
-		config.property(ClientProperties.CONNECT_TIMEOUT, connectTimeout);
-		config.property(ClientProperties.READ_TIMEOUT, readTimeout);
-		sslContext = SSLContext.getInstance("TLS");
-		sslContext.init(null, new TrustManager[] { customTm }, null);
-
-		// You don't have to set this as the default context,
-		// it depends on the library you're using.
-		SSLContext.setDefault(sslContext);
-		HttpsURLConnection.setDefaultSSLSocketFactory(sslContext.getSocketFactory());
-		HostnameVerifier allHostsValid = (hostname, session) -> true;
-		HttpsURLConnection.setDefaultHostnameVerifier(allHostsValid);
-		
-		}
-		 catch (IOException | KeyStoreException | NoSuchAlgorithmException | CertificateException | KeyManagementException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
+			// Get hold of the default trust manager
+			X509TrustManager myTm = null;
+			for (TrustManager tm : tmf.getTrustManagers()) {
+				if (tm instanceof X509TrustManager) {
+					myTm = (X509TrustManager) tm;
+					break;
+				}
 			}
-		return sslContext;
-    }
+			X509TrustManager defaultTm = null;
+			for (TrustManager tm : tmf.getTrustManagers()) {
+				if (tm instanceof X509TrustManager) {
+					defaultTm = (X509TrustManager) tm;
+					break;
+				}
+			}
+			// Wrap it in your own class.
+			final X509TrustManager finalDefaultTm = defaultTm;
+			final X509TrustManager finalMyTm = myTm;
+			X509TrustManager customTm = new X509TrustManager() {
+				@Override
+				public X509Certificate[] getAcceptedIssuers() {
+					// If you're planning to use client-cert auth,
+					// merge results from "defaultTm" and "myTm".
+					return finalDefaultTm.getAcceptedIssuers();
+				}
 
-    @SuppressWarnings("unchecked")
-	public  <T extends AccessToken> RestAPIUtils(Class<T> tokenClass) {
+				@Override
+				public void checkServerTrusted(X509Certificate[] chain, String authType) throws CertificateException {
+					try {
+						finalMyTm.checkServerTrusted(chain, authType);
+					} catch (CertificateException e) {
+						// This will throw another CertificateException if this fails too.
+						finalDefaultTm.checkServerTrusted(chain, authType);
+					}
+				}
+
+				@Override
+				public void checkClientTrusted(X509Certificate[] chain, String authType) throws CertificateException {
+					// If you're planning to use client-cert auth,
+					// do the same as checking the server.
+					finalDefaultTm.checkClientTrusted(chain, authType);
+				}
+			};
+
+			ClientConfig config = new ClientConfig();
+
+			config.property(ClientProperties.CONNECT_TIMEOUT, connectTimeout);
+			config.property(ClientProperties.READ_TIMEOUT, readTimeout);
+			sslContext = SSLContext.getInstance("TLS");
+			sslContext.init(null, new TrustManager[] { customTm }, null);
+
+			// You don't have to set this as the default context,
+			// it depends on the library you're using.
+			SSLContext.setDefault(sslContext);
+			HttpsURLConnection.setDefaultSSLSocketFactory(sslContext.getSocketFactory());
+			HostnameVerifier allHostsValid = (hostname, session) -> true;
+			HttpsURLConnection.setDefaultHostnameVerifier(allHostsValid);
+
+		} catch (IOException | KeyStoreException | NoSuchAlgorithmException | CertificateException
+				| KeyManagementException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		return sslContext;
+	}
+
+	@SuppressWarnings("unchecked")
+	public <T extends AccessToken> RestAPIUtils(Class<T> tokenClass) {
 		this.tokenClass = tokenClass;
 	}
+
 	@Override
 	public <T extends AccessToken> T post(String path, AccessTokenGrantRequest payload) {
-		//construct request path
+		// construct request path
 		ClientConfig clientConfig = new ClientConfig();
 		logger.info("post_called");
-	//	webTarget = client.target(Constants.getBaseurl()+"path");
-		
-		//  String secret = "Basic " + Base64.getEncoder().encode(new String("ectAJlZCfeb1AvhGgozgj7dkYl7gDVLa" + ":" + "m34XrqOjqDjz9HSx").getBytes());
-		  String secret = "Basic " + sailpoint.integration.Base64.encodeBytes(new String("ectAJlZCfeb1AvhGgozgj7dkYl7gDVLa" + ":" + "m34XrqOjqDjz9HSx").getBytes());
-		 // logger.info("secret:"+secret);
-		  Response response = (Response) client.target(UriBuilder.fromUri("https://192.168.243.133:8443/iiq/oauth2/generateToken").build()).request("application/json"). // JSON Request Type
+		Charset csets = Charset.forName("UTF-8");
+		String germanString = "ectAJlZCfeb1AvhGgozgj7dkYl7gDVLa" + ":" + "m34XrqOjqDjz9HSx";
+		byte[] bb = null;
+		StringBuilder stringBuilder = new StringBuilder();
+		bb = germanString.getBytes(csets);
+
+		for (int i = 0; i < bb.length; i++) {
+			stringBuilder.append(bb[i] + ",");
+		}
+		String buildedString = stringBuilder.toString();
+		buildedString = buildedString.substring(0, buildedString.length() - 1);
+
+		Response response = (Response) client
+				.target(UriBuilder.fromUri("https://192.168.243.133:8443/iiq/oauth2/generateToken").build())
+				.request("application/json"). // JSON Request Type
 				accept("application/json"). // Response access type - application/scim+json
-				header("Authorization", secret) // Authorization header goes here
+				header("Authorization", "Basic " + buildedString) // Authorization header goes here
 				.post(Entity.json(null)); // body with grant type
-			String token2 = response.readEntity(String.class); // reading response as string format
-			JSONObject jsonObject = new JSONObject(token2); 
-			logger.info("token:"+token2);
-				T token = (T) new MyToken(jsonObject.getString("access_token"),jsonObject.getLong("expires_in"),jsonObject.getString("access_token"),null,null);
-				
-				return token;
+		String token2 = response.readEntity(String.class); // reading response as string format
+		logger.info("token2:" + token2);
+		JSONObject jsonObject = new JSONObject(token2);
+		logger.info("token:" + token2);
+		T token = (T) new MyToken(jsonObject.getString("access_token"), jsonObject.getLong("expires_in"),
+				jsonObject.getString("access_token"), null, null);
+
+		return token;
 	}
-	
-	
+
 	@Override
 	public void notify(Consumer algorithm) {
 		// TODO Auto-generated method stub
 		logger.info("notify");
 		this.listeners.forEach(algorithm);
-		
-		
+
 	}
+
 	@Override
 	public TokenChangeObserver attach(TokenChangeObserver observer) {
 		logger.info("attach_token_change_observer");
 		listeners.add(observer);
 		return observer;
 	}
+
 	@Override
 	public void detach(TokenChangeObserver observer) {
 		// TODO Auto-generated method stub
-		
+
 	}
 }
